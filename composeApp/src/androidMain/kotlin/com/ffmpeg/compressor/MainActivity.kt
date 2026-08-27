@@ -25,27 +25,28 @@ class MainActivity : ComponentActivity() {
     private fun prepareFFmpegBinary(context: Context): String {
         val ffmpegFile = File(context.filesDir, "ffmpeg")
 
-        // Jika file belum ada atau ukurannya 0, salin dari assets
-        if (!ffmpegFile.exists() || ffmpegFile.length() == 0L) {
-            context.assets.open("ffmpeg").use { input ->
-                FileOutputStream(ffmpegFile).use { output ->
-                    input.copyTo(output)
-                }
+        // Hapus file lama jika ada agar izin/permission ter-reset bersih
+        if (ffmpegFile.exists()) {
+            ffmpegFile.delete()
+        }
+
+        // Salin biner dari assets ke internal storage
+        context.assets.open("ffmpeg").use { input ->
+            FileOutputStream(ffmpegFile).use { output ->
+                input.copyTo(output)
             }
         }
 
-        // Beri izin eksekusi secara eksplisit (Owner & World executable)
+        // Atur izin: Executable = true, ReadOnly = true (Non-writable wajib untuk Android 10+)
         ffmpegFile.setReadable(true, false)
-        ffmpegFile.setWritable(true, true)
-        val isExecutable = ffmpegFile.setExecutable(true, false)
+        ffmpegFile.setExecutable(true, false)
+        ffmpegFile.setWritable(false, false) // Kunci file agar tidak writable
 
-        // Fallback jika Java File API gagal mengubah izin di Android
-        if (!isExecutable) {
-            try {
-                Runtime.getRuntime().exec("chmod 777 ${ffmpegFile.absolutePath}").waitFor()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
+        // Execute chmod via shell sebagai fallback
+        try {
+            Runtime.getRuntime().exec("chmod 555 ${ffmpegFile.absolutePath}").waitFor()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
 
         return ffmpegFile.absolutePath
