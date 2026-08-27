@@ -1,5 +1,6 @@
 package com.ffmpeg.compressor
 
+import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -15,6 +16,8 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.ffmpeg.compressor.engine.AndroidFFmpegRunner
+import java.io.File
+import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
 
@@ -22,8 +25,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Salin biner FFmpeg dari Assets ke Internal Storage & beri izin eksekusi
+        val ffmpegPath = prepareFFmpegBinary(this)
+
         setContent {
-            val runner = remember { AndroidFFmpegRunner() }
+            // Oper path ffmpeg ke runner
+            val runner = remember { AndroidFFmpegRunner(ffmpegPath) }
 
             App(
                 runner = runner,
@@ -59,5 +66,22 @@ class MainActivity : ComponentActivity() {
                 }
             )
         }
+    }
+
+    private fun prepareFFmpegBinary(context: Context): String {
+        val ffmpegFile = File(context.filesDir, "ffmpeg")
+
+        if (!ffmpegFile.exists()) {
+            context.assets.open("ffmpeg").use { input ->
+                FileOutputStream(ffmpegFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+        }
+
+        // Beri izin eksekusi di penyimpanan internal aplikasi
+        ffmpegFile.setExecutable(true, false)
+
+        return ffmpegFile.absolutePath
     }
 }
