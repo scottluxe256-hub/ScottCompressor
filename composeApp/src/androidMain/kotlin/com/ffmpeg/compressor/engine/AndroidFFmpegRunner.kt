@@ -2,7 +2,6 @@ package com.ffmpeg.compressor.engine
 
 import kotlinx.coroutines.*
 import java.io.BufferedReader
-import java.io.File
 import java.io.InputStreamReader
 import java.util.regex.Pattern
 
@@ -22,30 +21,38 @@ class AndroidFFmpegRunner {
             }
 
             try {
-                // Pecah command string menjadi argumen list
                 val cleanCommand = rawCommand.trim()
-                val commandArgs = mutableListOf<String>()
-                
-                // Gunakan ffmpeg executable dari internal storage
-                commandArgs.add(ffmpegPath)
+                if (cleanCommand.isEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        onProgress(0f, "Error: Perintah FFmpeg kosong!", true, true)
+                    }
+                    return@launch
+                }
 
-                // Split argumen dengan memperhatikan tanda petik
+                val parsedArgs = mutableListOf<String>()
+                
+                // Gunakan Regex aman untuk menangkap argumen berspace & berganti baris
                 val regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'")
                 val matcher = regex.matcher(cleanCommand)
                 while (matcher.find()) {
-                    if (matcher.group(1) != null) {
-                        commandArgs.add(matcher.group(1))
-                    } else if (matcher.group(2) != null) {
-                        commandArgs.add(matcher.group(2))
-                    } else {
-                        commandArgs.add(matcher.group())
+                    val group1 = matcher.group(1)
+                    val group2 = matcher.group(2)
+                    when {
+                        group1 != null -> parsedArgs.add(group1)
+                        group2 != null -> parsedArgs.add(group2)
+                        else -> parsedArgs.add(matcher.group())
                     }
                 }
 
-                // Abaikan jika kata pertama dalam rawCommand adalah 'ffmpeg'
-                if (commandArgs.size > 1 && (commandArgs[1] == "ffmpeg" || commandArgs[1].endsWith("/ffmpeg"))) {
-                    commandArgs.removeAt(1)
+                // Hapus kata 'ffmpeg' jika user mengetiknya di paling awal command
+                if (parsedArgs.isNotEmpty() && (parsedArgs[0] == "ffmpeg" || parsedArgs[0].endsWith("/ffmpeg"))) {
+                    parsedArgs.removeAt(0)
                 }
+
+                // Masukkan path executable resmi sebagai argumen pertama
+                val commandArgs = mutableListOf<String>()
+                commandArgs.add(ffmpegPath)
+                commandArgs.addAll(parsedArgs)
 
                 val pb = ProcessBuilder(commandArgs)
                 pb.redirectErrorStream(true)
@@ -62,7 +69,6 @@ class AndroidFFmpegRunner {
                 while (reader.readLine().also { line = it } != null) {
                     val currentLine = line ?: break
 
-                    // Parser Durasi Total Video
                     val durMatcher = durationPattern.matcher(currentLine)
                     if (durMatcher.find()) {
                         val hours = durMatcher.group(1)?.toFloatOrNull() ?: 0f
@@ -71,7 +77,6 @@ class AndroidFFmpegRunner {
                         totalDurationSeconds = (hours * 3600) + (minutes * 60) + seconds
                     }
 
-                    // Parser Waktu Berjalan (Time) & Hitung Persentase
                     val timeMatcher = timePattern.matcher(currentLine)
                     if (timeMatcher.find()) {
                         val hours = timeMatcher.group(1)?.toFloatOrNull() ?: 0f
@@ -95,13 +100,13 @@ class AndroidFFmpegRunner {
                     if (exitCode == 0) {
                         onProgress(100f, "Ekspor Selesai!", true, false)
                     } else {
-                        onProgress(0f, "Gagal! Process exit code: $exitCode", true, true)
+                        onProgress(0f, "Gagal! Exit code: $exitCode", true, true)
                     }
                 }
 
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    onProgress(0f, "Error: ${e.message}", true, true)
+                    onProgress(0f, "Error: ${e.localizedMessage}", true, true)
                 }
             }
         }

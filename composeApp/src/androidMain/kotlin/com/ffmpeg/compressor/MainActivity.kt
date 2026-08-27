@@ -1,51 +1,41 @@
 package com.ffmpeg.compressor
 
-import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import com.ffmpeg.compressor.engine.AndroidFFmpegRunner
 import java.io.File
-import java.io.FileOutputStream
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val ffmpegAbsolutePath = prepareFFmpegBinary(this)
+        // Minta izin Akses Semua File untuk Android 11+ (API 30+)
+        checkStoragePermission()
+
+        val ffmpegPath = File(applicationInfo.nativeLibraryDir, "libffmpeg.so").absolutePath
 
         setContent {
             App(
-                ffmpegExecutablePath = ffmpegAbsolutePath,
+                ffmpegExecutablePath = ffmpegPath,
                 runner = AndroidFFmpegRunner()
             )
         }
     }
 
-    private fun prepareFFmpegBinary(context: Context): String {
-        // Gunakan codeCacheDir agar terhindar dari pemblokiran exec SELinux Android
-        val ffmpegFile = File(context.codeCacheDir, "ffmpeg")
-
-        if (ffmpegFile.exists()) {
-            ffmpegFile.delete()
-        }
-
-        context.assets.open("ffmpeg").use { input ->
-            FileOutputStream(ffmpegFile).use { output ->
-                input.copyTo(output)
+    private fun checkStoragePermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
+                val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                    data = Uri.parse("package:$packageName")
+                }
+                startActivity(intent)
             }
         }
-
-        // Set izin eksekusi menggunakan File API & fallback shell
-        ffmpegFile.setReadable(true, false)
-        ffmpegFile.setExecutable(true, false)
-
-        try {
-            Runtime.getRuntime().exec("chmod 755 ${ffmpegFile.absolutePath}").waitFor()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-
-        return ffmpegFile.absolutePath
     }
 }
