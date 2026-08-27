@@ -1,92 +1,113 @@
 package com.ffmpeg.compressor.engine
 
-import com.ffmpeg.compressor.model.CompressionSettings
-import com.ffmpeg.compressor.model.EncodingProgress
 import kotlinx.coroutines.*
 import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
+import java.util.regex.Pattern
 
-class AndroidFFmpegRunner(
-    private val extractedFfmpegPath: String = ""
-) : FFmpegRunner {
+class AndroidFFmpegRunner {
     private var currentProcess: Process? = null
     private var runnerScope: CoroutineScope? = null
 
-    override fun execute(
-        settings: CompressionSettings,
-        inputPath: String,
-        outputPath: String,
-        onProgress: (EncodingProgress) -> Unit
+    fun executeRawCommand(
+        ffmpegPath: String,
+        rawCommand: String,
+        onProgress: (floatProgress: Float, statusText: String, isFinished: Boolean, isError: Boolean) -> Unit
     ) {
         runnerScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
         runnerScope?.launch {
-            var progress = EncodingProgress(statusText = "Initializing Android Executable Launcher...")
-            onProgress(progress)
+            withContext(Dispatchers.Main) {
+                onProgress(0f, "Menyiapkan proses kompresi...", false, false)
+            }
 
             try {
-                // Utamakan extractedFfmpegPath dari assets/filesDir
-                val binaryPath = when {
-                    extractedFfmpegPath.isNotBlank() && File(extractedFfmpegPath).exists() -> extractedFfmpegPath
-                    File(settings.ffmpegPath).exists() -> settings.ffmpegPath
-                    File("/data/data/com.termux/files/usr/bin/ffmpeg").exists() -> "/data/data/com.termux/files/usr/bin/ffmpeg"
-                    else -> "ffmpeg"
+                // Pecah command string menjadi argumen list
+                val cleanCommand = rawCommand.trim()
+                val commandArgs = mutableListOf<String>()
+                
+                // Gunakan ffmpeg executable dari internal storage
+                commandArgs.add(ffmpegPath)
+
+                // Split argumen dengan memperhatikan tanda petik
+                val regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'")
+                val matcher = regex.matcher(cleanCommand)
+                while (matcher.find()) {
+                    if (matcher.group(1) != null) {
+                        commandArgs.add(matcher.group(1))
+                    } else if (matcher.group(2) != null) {
+                        commandArgs.add(matcher.group(2))
+                    } else {
+                        commandArgs.add(matcher.group())
+                    }
                 }
 
-                val args = settings.buildCommandArgsList(inputPath, outputPath).toMutableList()
-                args[0] = binaryPath
+                // Abaikan jika kata pertama dalam rawCommand adalah 'ffmpeg'
+                if (commandArgs.size > 1 && (commandArgs[1] == "ffmpeg" || commandArgs[1].endsWith("/ffmpeg"))) {
+                    commandArgs.removeAt(1)
+                }
 
-                val pb = ProcessBuilder(args)
+                val pb = ProcessBuilder(commandArgs)
                 pb.redirectErrorStream(true)
                 val process = pb.start()
                 currentProcess = process
 
                 val reader = BufferedReader(InputStreamReader(process.inputStream))
                 var line: String?
+                var totalDurationSeconds = 0f
+
+                val durationPattern = Pattern.compile("Duration: (\\d+):(\\d+):(\\d+\\.\\d+)")
+                val timePattern = Pattern.compile("time=(\\d+):(\\d+):(\\d+\\.\\d+)")
 
                 while (reader.readLine().also { line = it } != null) {
                     val currentLine = line ?: break
-                    progress = FFmpegLogParser.parseLine(currentLine, progress)
-                    withContext(Dispatchers.Main) {
-                        onProgress(progress)
+
+                    // Parser Durasi Total Video
+                    val durMatcher = durationPattern.matcher(currentLine)
+                    if (durMatcher.find()) {
+                        val hours = durMatcher.group(1)?.toFloatOrNull() ?: 0f
+                        val minutes = durMatcher.group(2)?.toFloatOrNull() ?: 0f
+                        val seconds = durMatcher.group(3)?.toFloatOrNull() ?: 0f
+                        totalDurationSeconds = (hours * 3600) + (minutes * 60) + seconds
+                    }
+
+                    // Parser Waktu Berjalan (Time) & Hitung Persentase
+                    val timeMatcher = timePattern.matcher(currentLine)
+                    if (timeMatcher.find()) {
+                        val hours = timeMatcher.group(1)?.toFloatOrNull() ?: 0f
+                        val minutes = timeMatcher.group(2)?.toFloatOrNull() ?: 0f
+                        val seconds = timeMatcher.group(3)?.toFloatOrNull() ?: 0f
+                        val currentTimeSeconds = (hours * 3600) + (minutes * 60) + seconds
+
+                        if (totalDurationSeconds > 0) {
+                            val calculatedProgress = (currentTimeSeconds / totalDurationSeconds) * 100f
+                            val clampedProgress = calculatedProgress.coerceIn(0f, 99f)
+
+                            withContext(Dispatchers.Main) {
+                                onProgress(clampedProgress, "Mengompresi...", false, false)
+                            }
+                        }
                     }
                 }
 
                 val exitCode = process.waitFor()
                 withContext(Dispatchers.Main) {
                     if (exitCode == 0) {
-                        onProgress(
-                            progress.copy(
-                                percentage = 100f,
-                                isFinished = true,
-                                statusText = "Android Compression Success!"
-                            )
-                        )
+                        onProgress(100f, "Ekspor Selesai!", true, false)
                     } else {
-                        onProgress(
-                            progress.copy(
-                                isFinished = true,
-                                isError = true,
-                                errorMessage = "Android FFmpeg process exited with code $exitCode"
-                            )
-                        )
+                        onProgress(0f, "Gagal! Process exit code: $exitCode", true, true)
                     }
                 }
+
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    onProgress(
-                        progress.copy(
-                            isFinished = true,
-                            isError = true,
-                            errorMessage = e.message ?: "Failed to execute Android FFmpeg process"
-                        )
-                    )
+                    onProgress(0f, "Error: ${e.message}", true, true)
                 }
             }
         }
     }
 
-    override fun cancel() {
+    fun cancel() {
         try {
             currentProcess?.destroyForcibly()
             runnerScope?.cancel()

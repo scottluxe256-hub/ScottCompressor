@@ -1,6 +1,3 @@
-rootProject.name = "FFmpegCompressorStudio"
-include(":composeApp")
-
 pluginManagement {
     repositories {
         google()
@@ -8,10 +5,12 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-
 dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
     }
 }
+
+rootProject.name = "FFmpegCompressor"
+include(":composeApp")
