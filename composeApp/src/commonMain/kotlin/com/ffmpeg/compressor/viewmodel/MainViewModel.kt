@@ -2,7 +2,6 @@ package com.ffmpeg.compressor.viewmodel
 
 import com.ffmpeg.compressor.data.DraftManager
 import com.ffmpeg.compressor.engine.FFmpegRunner
-import com.ffmpeg.compressor.model.CompressionPreset
 import com.ffmpeg.compressor.model.CompressionSettings
 import com.ffmpeg.compressor.model.DraftItem
 import com.ffmpeg.compressor.model.EncodingProgress

@@ -21,17 +21,11 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
       - name: Make Gradlew Executable
         run: chmod +x gradlew
 
       - name: Build Android Release APK
-        env:
-          GRADLE_OPTS: ""
-          JAVA_OPTS: ""
-        run: ./gradlew assembleRelease --no-daemon -Dorg.gradle.jvmargs="-Xmx2048m"
+        run: ./gradlew assembleRelease --no-daemon
 
       - name: Upload Android APK Artifact
         uses: actions/upload-artifact@v4
@@ -52,14 +46,8 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
       - name: Build Windows Executable Package
-        env:
-          GRADLE_OPTS: ""
-          JAVA_OPTS: ""
-        run: ./gradlew packageDistributionForCurrentOS --no-daemon -Dorg.gradle.jvmargs="-Xmx2048m"
+        run: ./gradlew packageDistributionForCurrentOS --no-daemon
 
       - name: Upload Windows Distribution Artifact
         uses: actions/upload-artifact@v4
