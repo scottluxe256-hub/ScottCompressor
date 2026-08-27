@@ -39,6 +39,15 @@ android {
         versionName = "1.0"
     }
 
+    // Tambahkan blok signingConfigs di sini
+    buildTypes {
+        getByName("release") {
+            isMinifyEnabled = false
+            // Paksa build release menggunakan kunci tanda tangan debug agar bisa diinstal
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
