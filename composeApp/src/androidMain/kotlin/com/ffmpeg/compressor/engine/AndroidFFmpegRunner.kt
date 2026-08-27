@@ -7,7 +7,9 @@ import java.io.BufferedReader
 import java.io.File
 import java.io.InputStreamReader
 
-class AndroidFFmpegRunner : FFmpegRunner {
+class AndroidFFmpegRunner(
+    private val extractedFfmpegPath: String = ""
+) : FFmpegRunner {
     private var currentProcess: Process? = null
     private var runnerScope: CoroutineScope? = null
 
@@ -23,13 +25,12 @@ class AndroidFFmpegRunner : FFmpegRunner {
             onProgress(progress)
 
             try {
-                // Determine binary path for Termux / executable launcher context
-                val binaryPath = if (File(settings.ffmpegPath).exists()) {
-                    settings.ffmpegPath
-                } else if (File("/data/data/com.termux/files/usr/bin/ffmpeg").exists()) {
-                    "/data/data/com.termux/files/usr/bin/ffmpeg"
-                } else {
-                    "ffmpeg"
+                // Utamakan extractedFfmpegPath dari assets/filesDir
+                val binaryPath = when {
+                    extractedFfmpegPath.isNotBlank() && File(extractedFfmpegPath).exists() -> extractedFfmpegPath
+                    File(settings.ffmpegPath).exists() -> settings.ffmpegPath
+                    File("/data/data/com.termux/files/usr/bin/ffmpeg").exists() -> "/data/data/com.termux/files/usr/bin/ffmpeg"
+                    else -> "ffmpeg"
                 }
 
                 val args = settings.buildCommandArgsList(inputPath, outputPath).toMutableList()
