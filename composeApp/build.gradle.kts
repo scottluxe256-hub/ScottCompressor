@@ -61,9 +61,17 @@ android {
         versionName = "1.0.0"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Menggunakan debug key bawaan Gradle agar release APK ter-sign otomatis
+        }
+    }
+
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            // PAKSA RELEASE AGAR PAKAI DEBUG SIGNATURE
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
     compileOptions {

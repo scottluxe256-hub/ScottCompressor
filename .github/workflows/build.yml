@@ -1,4 +1,4 @@
-name: Build FFmpeg Compressor Studio
+name: Build Android APK
 
 on:
   push:
@@ -32,25 +32,3 @@ jobs:
         with:
           name: FFmpegCompressorStudio-Android-APK
           path: composeApp/build/outputs/apk/release/*.apk
-
-  build-windows:
-    name: Build Windows Desktop Installer
-    runs-on: windows-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-
-      - name: Build Windows Executable Package
-        run: ./gradlew packageDistributionForCurrentOS --no-daemon
-
-      - name: Upload Windows Distribution Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: FFmpegCompressorStudio-Windows-Distribution
-          path: composeApp/build/compose/binaries/main/
