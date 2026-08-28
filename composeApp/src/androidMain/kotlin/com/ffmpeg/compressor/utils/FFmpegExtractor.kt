@@ -14,17 +14,11 @@ object FFmpegExtractor {
         zipFileName: String = "ffmpeg.zip",
         onProgress: (progress: Float, status: String) -> Unit
     ): String = withContext(Dispatchers.IO) {
-        // Gunakan nativeLibraryDir agar tidak diblokir SELinux Android
-        val targetDir = File(context.applicationInfo.nativeLibraryDir)
-        if (!targetDir.exists()) {
-            targetDir.mkdirs()
-        }
-        
-        val targetFile = File(targetDir, "ffmpeg")
+        // PERBAIKAN: Gunakan filesDir privat dengan nama berakhiran .so (Lolos SELinux & Aman Izin Tulis)
+        val targetFile = File(context.filesDir, "libffmpeg.so")
 
-        // Jika biner sudah ada di nativeLibraryDir dan ukurannya valid
-        if (targetFile.exists() && targetFile.length() > 10 * 1024 * 1024) {
-            targetFile.setExecutable(true, false)
+        // Jika biner sudah ada, ukurannya valid (>10MB), dan bisa dieksekusi, langsung pakai
+        if (targetFile.exists() && targetFile.length() > 10 * 1024 * 1024 && targetFile.canExecute()) {
             return@withContext targetFile.absolutePath
         }
 
@@ -49,10 +43,12 @@ object FFmpegExtractor {
 
         if (totalBytes <= 0) totalBytes = 30 * 1024 * 1024L
 
+        // Proses ekstraksi dari assets/ffmpeg.zip
         context.assets.open(zipFileName).use { input ->
             ZipInputStream(input).use { zipInput ->
                 var entry = zipInput.nextEntry
                 while (entry != null) {
+                    // Mencari entry biner 'ffmpeg' di dalam zip
                     if (entry.name == "ffmpeg" || entry.name.endsWith("ffmpeg") || entry.name.endsWith(".so")) {
                         val buffer = ByteArray(8192)
                         var bytesRead: Int
@@ -76,7 +72,7 @@ object FFmpegExtractor {
             }
         }
 
-        // Atur izin eksekusi native Linux & Java
+        // Paksa beri izin eksekusi Linux (chmod 755)
         try {
             targetFile.setExecutable(true, false)
             val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${targetFile.absolutePath}")
