@@ -18,13 +18,17 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         checkStoragePermission()
 
-        // Ambil langsung path biner libffmpeg.so resmi dari nativeLibraryDir
-        val ffmpegPath = File(applicationInfo.nativeLibraryDir, "libffmpeg.so").absolutePath
+        // Ambil path biner libffmpeg.so resmi yang diekstrak Android dari jniLibs
+        val ffmpegFile = File(applicationInfo.nativeLibraryDir, "libffmpeg.so")
+        
+        // Memastikan biner diberi izin eksekusi jika OS membatasi
+        if (ffmpegFile.exists()) {
+            ffmpegFile.setExecutable(true, false)
+        }
 
         setContent {
-            // Tampilan utama aplikasi langsung terbuka tanpa loading ekstraksi
             App(
-                ffmpegExecutablePath = ffmpegPath,
+                ffmpegExecutablePath = ffmpegFile.absolutePath,
                 runner = runner
             )
         }
@@ -32,7 +36,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        runner.cancel() // Membersihkan memori RAM & membunuh proses ffmpeg jika app ditutup
+        runner.cancel()
     }
 
     private fun checkStoragePermission() {

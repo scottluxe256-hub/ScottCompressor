@@ -28,24 +28,26 @@ class AndroidFFmpegRunner {
                     return@launch
                 }
 
-                // 1. Parsing string perintah dengan aman tanpa merusak isi di dalam tanda petik
+                // Parse argumen perintah secara aman (menangani tanda petik & spasi)
                 val parsedArgs = parseCommandLine(cleanCommand).toMutableList()
 
-                // 2. Jika elemen pertama berupa nama biner (ffmpeg, libffmpeg.so, dsb), hapus agar tidak duplikat
+                // Hapus token pertama jika pengguna mengetik "ffmpeg" atau "libffmpeg.so" di input text
                 if (parsedArgs.isNotEmpty()) {
                     val firstToken = parsedArgs[0].lowercase()
-                    if (firstToken == "ffmpeg" || firstToken == "libffmpeg.so" || firstToken.endsWith("/ffmpeg") || firstToken.endsWith("/libffmpeg.so")) {
+                    if (firstToken == "ffmpeg" || firstToken == "libffmpeg.so" || 
+                        firstToken.endsWith("/ffmpeg") || firstToken.endsWith("/libffmpeg.so")) {
                         parsedArgs.removeAt(0)
                     }
                 }
 
-                // 3. Susun argumen final dengan path biner native sebagai executable utama
+                // Gabungkan path biner resmi native (.so) dengan argumen
                 val commandArgs = mutableListOf<String>()
                 commandArgs.add(ffmpegPath)
                 commandArgs.addAll(parsedArgs)
 
                 val pb = ProcessBuilder(commandArgs)
                 pb.redirectErrorStream(true)
+                
                 val process = pb.start()
                 currentProcess = process
 
@@ -59,7 +61,7 @@ class AndroidFFmpegRunner {
                 while (reader.readLine().also { line = it } != null) {
                     val currentLine = line ?: break
 
-                    // Tangkap durasi total video
+                    // Hitung total durasi video
                     val durMatch = durationRegex.find(currentLine)
                     if (durMatch != null) {
                         val hours = durMatch.groupValues[1].toFloatOrNull() ?: 0f
@@ -68,7 +70,7 @@ class AndroidFFmpegRunner {
                         totalDurationSeconds = (hours * 3600) + (minutes * 60) + seconds
                     }
 
-                    // Tangkap waktu progress berjalan
+                    // Hitung progress kompresi
                     val timeMatch = timeRegex.find(currentLine)
                     if (timeMatch != null) {
                         val hours = timeMatch.groupValues[1].toFloatOrNull() ?: 0f
@@ -104,7 +106,7 @@ class AndroidFFmpegRunner {
         }
     }
 
-    // Parser manual untuk menangani tanda petik tunggal '...' dan petik ganda "..." dengan benar
+    // Parser manual untuk menjaga keutuhan parameter ber-spasi atau berpetik
     private fun parseCommandLine(command: String): List<String> {
         val args = mutableListOf<String>()
         val currentArg = StringBuilder()
