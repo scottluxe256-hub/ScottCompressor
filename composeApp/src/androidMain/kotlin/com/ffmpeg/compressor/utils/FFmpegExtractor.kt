@@ -14,9 +14,9 @@ object FFmpegExtractor {
         zipFileName: String = "ffmpeg.zip",
         onProgress: (progress: Float, status: String) -> Unit
     ): String = withContext(Dispatchers.IO) {
-        val targetFile = File(context.filesDir, "libffmpeg.so")
+        // Nama file target di internal storage diset jadi 'ffmpeg'
+        val targetFile = File(context.filesDir, "ffmpeg")
 
-        // Jika biner sudah ada & ukurannya valid (>10MB), tidak perlu ekstraksi ulang
         if (targetFile.exists() && targetFile.length() > 10 * 1024 * 1024) {
             return@withContext targetFile.absolutePath
         }
@@ -25,7 +25,6 @@ object FFmpegExtractor {
             onProgress(0f, "Menyiapkan ekstraksi file biner...")
         }
 
-        // Hitung perkiraan total byte zip untuk persentase
         var totalBytes = 0L
         try {
             context.assets.open(zipFileName).use { input ->
@@ -41,14 +40,14 @@ object FFmpegExtractor {
             e.printStackTrace()
         }
 
-        if (totalBytes <= 0) totalBytes = 30 * 1024 * 1024L // Fallback 30MB
+        if (totalBytes <= 0) totalBytes = 30 * 1024 * 1024L
 
-        // Ekstrak file ZIP dan hitung progress byte
         context.assets.open(zipFileName).use { input ->
             ZipInputStream(input).use { zipInput ->
                 var entry = zipInput.nextEntry
                 while (entry != null) {
-                    if (entry.name == "libffmpeg.so" || entry.name.endsWith(".so") || entry.name == "ffmpeg") {
+                    // Cek nama entry file di dalam zip 'ffmpeg'
+                    if (entry.name == "ffmpeg" || entry.name.endsWith("ffmpeg")) {
                         val buffer = ByteArray(8192)
                         var bytesRead: Int
                         var extractedBytes = 0L
