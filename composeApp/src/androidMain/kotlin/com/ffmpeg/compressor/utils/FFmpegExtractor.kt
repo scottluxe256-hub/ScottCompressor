@@ -14,10 +14,17 @@ object FFmpegExtractor {
         zipFileName: String = "ffmpeg.zip",
         onProgress: (progress: Float, status: String) -> Unit
     ): String = withContext(Dispatchers.IO) {
-        val targetFile = File(context.filesDir, "ffmpeg")
+        // Gunakan nativeLibraryDir agar tidak diblokir SELinux Android
+        val targetDir = File(context.applicationInfo.nativeLibraryDir)
+        if (!targetDir.exists()) {
+            targetDir.mkdirs()
+        }
+        
+        val targetFile = File(targetDir, "ffmpeg")
 
-        // Jika biner sudah ada & executable, cukup kembalikan path
-        if (targetFile.exists() && targetFile.length() > 10 * 1024 * 1024 && targetFile.canExecute()) {
+        // Jika biner sudah ada di nativeLibraryDir dan ukurannya valid
+        if (targetFile.exists() && targetFile.length() > 10 * 1024 * 1024) {
+            targetFile.setExecutable(true, false)
             return@withContext targetFile.absolutePath
         }
 
@@ -69,8 +76,9 @@ object FFmpegExtractor {
             }
         }
 
-        // PAKSA IZIN EKSEKUSI MANUSIAWI (CHMOD 755) VIA LINUX PROCESS
+        // Atur izin eksekusi native Linux & Java
         try {
+            targetFile.setExecutable(true, false)
             val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${targetFile.absolutePath}")
             chmodProcess.waitFor()
         } catch (e: Exception) {
