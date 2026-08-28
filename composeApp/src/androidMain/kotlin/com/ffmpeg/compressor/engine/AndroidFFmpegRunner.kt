@@ -30,15 +30,15 @@ class AndroidFFmpegRunner {
                 }
 
                 val parsedArgs = mutableListOf<String>()
-                val regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'")
+                // Parser Regex presisi: Memisahkan string ber-spasi di dalam tanda petik ganda/tunggal
+                val regex = Pattern.compile("\"([^\"]*)\"|'([^']*)'|(\\S+)")
                 val matcher = regex.matcher(cleanCommand)
+
                 while (matcher.find()) {
-                    val group1 = matcher.group(1)
-                    val group2 = matcher.group(2)
                     when {
-                        group1 != null -> parsedArgs.add(group1)
-                        group2 != null -> parsedArgs.add(group2)
-                        else -> parsedArgs.add(matcher.group())
+                        matcher.group(1) != null -> parsedArgs.add(matcher.group(1)) // Isi tanda petik ganda "..."
+                        matcher.group(2) != null -> parsedArgs.add(matcher.group(2)) // Isi tanda petik tunggal '...'
+                        else -> parsedArgs.add(matcher.group(3))                     // Parameter biasa tanpa petik
                     }
                 }
 
@@ -109,16 +109,15 @@ class AndroidFFmpegRunner {
     }
 
     fun cancel() {
-    try {
-        currentProcess?.destroyForcibly()
-        runnerScope?.cancel()
+        try {
+            currentProcess?.destroyForcibly()
+            runnerScope?.cancel()
 
-        // Cukup panggil nama biner ffmpeg saja
-        Runtime.getRuntime().exec("killall -9 ffmpeg")
-    } catch (e: Exception) {
-        e.printStackTrace()
-    } finally {
-        currentProcess = null
+            Runtime.getRuntime().exec("killall -9 libffmpeg.so")
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            currentProcess = null
+        }
     }
-  }
 }
