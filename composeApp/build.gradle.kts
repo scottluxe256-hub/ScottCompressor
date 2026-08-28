@@ -37,7 +37,7 @@ android {
         targetSdk = 34
         versionCode = 1
         versionName = "1.0"
-        
+
         ndk {
             abiFilters.add("arm64-v8a")
         }
@@ -46,15 +46,13 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
-            // Paksa build release menggunakan signing debug agar APK tidak Parse Error saat diinstall
             signingConfig = signingConfigs.getByName("debug")
         }
     }
 
-    // Optimasi kecepatan instalasi APK agar tidak me-dekompres ulang file .so
     packaging {
         jniLibs {
-            useLegacyPackaging = false
+            useLegacyPackaging = true
         }
     }
 
@@ -62,7 +60,7 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    
+
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     sourceSets["main"].res.srcDirs("src/androidMain/res")
     sourceSets["main"].jniLibs.srcDirs("src/androidMain/jniLibs")
