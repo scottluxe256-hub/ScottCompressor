@@ -3,7 +3,6 @@ package com.ffmpeg.compressor.engine
 import kotlinx.coroutines.*
 import java.io.BufferedReader
 import java.io.InputStreamReader
-import java.util.regex.Pattern
 
 class AndroidFFmpegRunner {
     private var currentProcess: Process? = null
@@ -29,23 +28,18 @@ class AndroidFFmpegRunner {
                     return@launch
                 }
 
-                val parsedArgs = mutableListOf<String>()
-                // Parser Regex presisi: Memisahkan string ber-spasi di dalam tanda petik ganda/tunggal
-                val regex = Pattern.compile("\"([^\"]*)\"|'([^']*)'|(\\S+)")
-                val matcher = regex.matcher(cleanCommand)
+                // 1. Parsing string perintah dengan aman tanpa merusak isi di dalam tanda petik
+                val parsedArgs = parseCommandLine(cleanCommand).toMutableList()
 
-                while (matcher.find()) {
-                    when {
-                        matcher.group(1) != null -> parsedArgs.add(matcher.group(1)) // Isi tanda petik ganda "..."
-                        matcher.group(2) != null -> parsedArgs.add(matcher.group(2)) // Isi tanda petik tunggal '...'
-                        else -> parsedArgs.add(matcher.group(3))                     // Parameter biasa tanpa petik
+                // 2. Jika elemen pertama berupa nama biner (ffmpeg, libffmpeg.so, dsb), hapus agar tidak duplikat
+                if (parsedArgs.isNotEmpty()) {
+                    val firstToken = parsedArgs[0].lowercase()
+                    if (firstToken == "ffmpeg" || firstToken == "libffmpeg.so" || firstToken.endsWith("/ffmpeg") || firstToken.endsWith("/libffmpeg.so")) {
+                        parsedArgs.removeAt(0)
                     }
                 }
 
-                if (parsedArgs.isNotEmpty() && (parsedArgs[0] == "ffmpeg" || parsedArgs[0].endsWith("/ffmpeg"))) {
-                    parsedArgs.removeAt(0)
-                }
-
+                // 3. Susun argumen final dengan path biner native sebagai executable utama
                 val commandArgs = mutableListOf<String>()
                 commandArgs.add(ffmpegPath)
                 commandArgs.addAll(parsedArgs)
@@ -59,25 +53,27 @@ class AndroidFFmpegRunner {
                 var line: String?
                 var totalDurationSeconds = 0f
 
-                val durationPattern = Pattern.compile("Duration: (\\d+):(\\d+):(\\d+\\.\\d+)")
-                val timePattern = Pattern.compile("time=(\\d+):(\\d+):(\\d+\\.\\d+)")
+                val durationRegex = Regex("""Duration:\s*(\d+):(\d+):(\d+\.\d+)""")
+                val timeRegex = Regex("""time=\s*(\d+):(\d+):(\d+\.\d+)""")
 
                 while (reader.readLine().also { line = it } != null) {
                     val currentLine = line ?: break
 
-                    val durMatcher = durationPattern.matcher(currentLine)
-                    if (durMatcher.find()) {
-                        val hours = durMatcher.group(1)?.toFloatOrNull() ?: 0f
-                        val minutes = durMatcher.group(2)?.toFloatOrNull() ?: 0f
-                        val seconds = durMatcher.group(3)?.toFloatOrNull() ?: 0f
+                    // Tangkap durasi total video
+                    val durMatch = durationRegex.find(currentLine)
+                    if (durMatch != null) {
+                        val hours = durMatch.groupValues[1].toFloatOrNull() ?: 0f
+                        val minutes = durMatch.groupValues[2].toFloatOrNull() ?: 0f
+                        val seconds = durMatch.groupValues[3].toFloatOrNull() ?: 0f
                         totalDurationSeconds = (hours * 3600) + (minutes * 60) + seconds
                     }
 
-                    val timeMatcher = timePattern.matcher(currentLine)
-                    if (timeMatcher.find()) {
-                        val hours = timeMatcher.group(1)?.toFloatOrNull() ?: 0f
-                        val minutes = timeMatcher.group(2)?.toFloatOrNull() ?: 0f
-                        val seconds = timeMatcher.group(3)?.toFloatOrNull() ?: 0f
+                    // Tangkap waktu progress berjalan
+                    val timeMatch = timeRegex.find(currentLine)
+                    if (timeMatch != null) {
+                        val hours = timeMatch.groupValues[1].toFloatOrNull() ?: 0f
+                        val minutes = timeMatch.groupValues[2].toFloatOrNull() ?: 0f
+                        val seconds = timeMatch.groupValues[3].toFloatOrNull() ?: 0f
                         val currentTimeSeconds = (hours * 3600) + (minutes * 60) + seconds
 
                         if (totalDurationSeconds > 0) {
@@ -108,12 +104,38 @@ class AndroidFFmpegRunner {
         }
     }
 
+    // Parser manual untuk menangani tanda petik tunggal '...' dan petik ganda "..." dengan benar
+    private fun parseCommandLine(command: String): List<String> {
+        val args = mutableListOf<String>()
+        val currentArg = StringBuilder()
+        var insideSingleQuotes = false
+        var insideDoubleQuotes = false
+
+        for (char in command) {
+            when (char) {
+                '\'' -> if (!insideDoubleQuotes) insideSingleQuotes = !insideSingleQuotes else currentArg.append(char)
+                '"' -> if (!insideSingleQuotes) insideDoubleQuotes = !insideDoubleQuotes else currentArg.append(char)
+                ' ' -> {
+                    if (insideSingleQuotes || insideDoubleQuotes) {
+                        currentArg.append(char)
+                    } else if (currentArg.isNotEmpty()) {
+                        args.add(currentArg.toString())
+                        currentArg.setLength(0)
+                    }
+                }
+                else -> currentArg.append(char)
+            }
+        }
+        if (currentArg.isNotEmpty()) {
+            args.add(currentArg.toString())
+        }
+        return args
+    }
+
     fun cancel() {
         try {
             currentProcess?.destroyForcibly()
             runnerScope?.cancel()
-
-            Runtime.getRuntime().exec("killall -9 libffmpeg.so")
         } catch (e: Exception) {
             e.printStackTrace()
         } finally {
