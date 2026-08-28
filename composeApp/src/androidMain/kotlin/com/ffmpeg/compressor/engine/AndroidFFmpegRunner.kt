@@ -30,8 +30,6 @@ class AndroidFFmpegRunner {
                 }
 
                 val parsedArgs = mutableListOf<String>()
-                
-                // Gunakan Regex aman untuk menangkap argumen berspace & berganti baris
                 val regex = Pattern.compile("[^\\s\"']+|\"([^\"]*)\"|'([^']*)'")
                 val matcher = regex.matcher(cleanCommand)
                 while (matcher.find()) {
@@ -44,12 +42,10 @@ class AndroidFFmpegRunner {
                     }
                 }
 
-                // Hapus kata 'ffmpeg' jika user mengetiknya di paling awal command
                 if (parsedArgs.isNotEmpty() && (parsedArgs[0] == "ffmpeg" || parsedArgs[0].endsWith("/ffmpeg"))) {
                     parsedArgs.removeAt(0)
                 }
 
-                // Masukkan path executable resmi sebagai argumen pertama
                 val commandArgs = mutableListOf<String>()
                 commandArgs.add(ffmpegPath)
                 commandArgs.addAll(parsedArgs)
@@ -113,11 +109,16 @@ class AndroidFFmpegRunner {
     }
 
     fun cancel() {
-        try {
-            currentProcess?.destroyForcibly()
-            runnerScope?.cancel()
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
+    try {
+        currentProcess?.destroyForcibly()
+        runnerScope?.cancel()
+
+        // Cukup panggil nama biner ffmpeg saja
+        Runtime.getRuntime().exec("killall -9 ffmpeg")
+    } catch (e: Exception) {
+        e.printStackTrace()
+    } finally {
+        currentProcess = null
     }
+  }
 }

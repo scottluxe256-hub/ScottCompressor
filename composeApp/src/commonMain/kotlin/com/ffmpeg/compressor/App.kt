@@ -94,7 +94,7 @@ fun App(
                     }
                 }
 
-                // Overlay Loading Estimasi Persentase Simpel
+                // Overlay Loading Kompresi
                 if (isProcessing) {
                     Box(
                         modifier = Modifier
@@ -162,6 +162,73 @@ fun App(
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Layar Loading Ekstraksi Zip (Dipakai di MainActivity saat pertama kali buka app)
+@Composable
+fun ExtractionLoadingScreen(
+    progress: Float,
+    statusText: String
+) {
+    MaterialTheme(colorScheme = darkColorScheme()) {
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = Color(0xFF121212)
+        ) {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth(0.85f)
+                        .padding(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFF1E1E1E)),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Menyiapkan Komponen Native",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        LinearProgressIndicator(
+                            progress = { progress / 100f },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(8.dp),
+                            color = Color(0xFF00E676),
+                            trackColor = Color.DarkGray
+                        )
+
+                        Spacer(modifier = Modifier.height(12.dp))
+
+                        Text(
+                            text = "${progress.toInt()}%",
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = statusText,
+                            fontSize = 12.sp,
+                            color = Color.LightGray
+                        )
                     }
                 }
             }
