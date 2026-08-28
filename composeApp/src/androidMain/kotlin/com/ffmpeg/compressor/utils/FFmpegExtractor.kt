@@ -14,10 +14,10 @@ object FFmpegExtractor {
         zipFileName: String = "ffmpeg.zip",
         onProgress: (progress: Float, status: String) -> Unit
     ): String = withContext(Dispatchers.IO) {
-        // Nama file target di internal storage diset jadi 'ffmpeg'
         val targetFile = File(context.filesDir, "ffmpeg")
 
-        if (targetFile.exists() && targetFile.length() > 10 * 1024 * 1024) {
+        // Jika biner sudah ada & executable, cukup kembalikan path
+        if (targetFile.exists() && targetFile.length() > 10 * 1024 * 1024 && targetFile.canExecute()) {
             return@withContext targetFile.absolutePath
         }
 
@@ -46,8 +46,7 @@ object FFmpegExtractor {
             ZipInputStream(input).use { zipInput ->
                 var entry = zipInput.nextEntry
                 while (entry != null) {
-                    // Cek nama entry file di dalam zip 'ffmpeg'
-                    if (entry.name == "ffmpeg" || entry.name.endsWith("ffmpeg")) {
+                    if (entry.name == "ffmpeg" || entry.name.endsWith("ffmpeg") || entry.name.endsWith(".so")) {
                         val buffer = ByteArray(8192)
                         var bytesRead: Int
                         var extractedBytes = 0L
@@ -70,8 +69,13 @@ object FFmpegExtractor {
             }
         }
 
-        // Beri izin eksekusi penuh (chmod +x)
-        targetFile.setExecutable(true, false)
+        // PAKSA IZIN EKSEKUSI MANUSIAWI (CHMOD 755) VIA LINUX PROCESS
+        try {
+            val chmodProcess = Runtime.getRuntime().exec("chmod 755 ${targetFile.absolutePath}")
+            chmodProcess.waitFor()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         withContext(Dispatchers.Main) {
             onProgress(100f, "Ekstraksi Selesai!")
