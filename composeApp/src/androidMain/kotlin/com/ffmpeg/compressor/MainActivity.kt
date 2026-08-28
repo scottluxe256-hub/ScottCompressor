@@ -8,10 +8,8 @@ import android.os.Environment
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.runtime.*
 import com.ffmpeg.compressor.engine.AndroidFFmpegRunner
-import com.ffmpeg.compressor.utils.FFmpegExtractor
-import kotlinx.coroutines.launch
+import java.io.File
 
 class MainActivity : ComponentActivity() {
     private val runner = AndroidFFmpegRunner()
@@ -20,42 +18,21 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         checkStoragePermission()
 
+        // Ambil langsung path biner libffmpeg.so resmi dari nativeLibraryDir
+        val ffmpegPath = File(applicationInfo.nativeLibraryDir, "libffmpeg.so").absolutePath
+
         setContent {
-            var ffmpegExecutablePath by remember { mutableStateOf<String?>(null) }
-            var extractProgress by remember { mutableStateOf(0f) }
-            var extractStatus by remember { mutableStateOf("Memeriksa komponen...") }
-            val coroutineScope = rememberCoroutineScope()
-
-            LaunchedEffect(Unit) {
-                coroutineScope.launch {
-                    // Ekstrak ffmpeg dari assets ke filesDir internal
-                    val path = FFmpegExtractor.extractIfNeeded(applicationContext) { progress, status ->
-                        extractProgress = progress
-                        extractStatus = status
-                    }
-                    ffmpegExecutablePath = path
-                }
-            }
-
-            if (ffmpegExecutablePath == null) {
-                // Layar loading indikator ekstraksi zip
-                ExtractionLoadingScreen(
-                    progress = extractProgress,
-                    statusText = extractStatus
-                )
-            } else {
-                // Tampilan utama aplikasi setelah biner ffmpeg siap
-                App(
-                    ffmpegExecutablePath = ffmpegExecutablePath!!,
-                    runner = runner
-                )
-            }
+            // Tampilan utama aplikasi langsung terbuka tanpa loading ekstraksi
+            App(
+                ffmpegExecutablePath = ffmpegPath,
+                runner = runner
+            )
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        runner.cancel() // Pembersihan RAM & pembunuhan proses ffmpeg saat app ditutup
+        runner.cancel() // Membersihkan memori RAM & membunuh proses ffmpeg jika app ditutup
     }
 
     private fun checkStoragePermission() {
